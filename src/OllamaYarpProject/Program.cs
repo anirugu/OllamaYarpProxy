@@ -2,9 +2,9 @@ using OllamaYarpProject;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add logging to console
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
+// Remove explicit logging configuration to allow appsettings.json to control logging
+// builder.Logging.ClearProviders();
+// builder.Logging.AddConsole();
 
 builder.Services.AddSingleton<StandardTransform>();
 

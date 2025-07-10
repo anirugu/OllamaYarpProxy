@@ -1,5 +1,4 @@
-using Yarp.ReverseProxy;
-using Microsoft.Extensions.Logging;
+using OllamaYarpProject;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,9 +6,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
+builder.Services.AddSingleton<StandardTransform>();
+
 // Add YARP reverse proxy
 builder.Services.AddReverseProxy()
-    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddTransforms<StandardTransform>();
 
 var app = builder.Build();
 

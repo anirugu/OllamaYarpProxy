@@ -8,7 +8,7 @@ This project is an ASP.NET Core reverse proxy that exposes the same endpoint as 
    ```pwsh
    dotnet run
    ```
-2. The proxy will listen on the default port (e.g., http://localhost:5000) and forward requests to http://localhost:4000.
+2. The proxy will listen on the default port (e.g., http://localhost:11434) and forward requests to http://localhost:4000.
 
 ## Configuration
 

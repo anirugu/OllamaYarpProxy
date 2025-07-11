@@ -30,6 +30,7 @@ public class StandardTransform : ITransformProvider
         {
             var context = transformContext.HttpContext;
 
+
             if (context.Request.Path == "/api/tags")
             {
                 //we need to change the request to the endpoint models
@@ -60,13 +61,20 @@ public class StandardTransform : ITransformProvider
                 GemmaModel answer = new GemmaModel();
                 //answer.License = "MIT";
                 //answer.Modelfile = "model.gguf";
-                answer.Capabilities = new List<string> { "chat"};
+                answer.Capabilities = new List<string> { "chat" };
                 answer.ModelInfo = new ModelInfo();
                 answer.ModelInfo.Architecture = model;
 
-                var jsonResponse = JsonConvert.SerializeObject(answer, Formatting.Indented);    
+                var jsonResponse = JsonConvert.SerializeObject(answer, Formatting.Indented);
 
                 await response.WriteAsync(jsonResponse);
+            }
+            else if (context.Request.Path == "/api/version") 
+            {
+                var response = transformContext.HttpContext.Response;
+                response.StatusCode = 200;
+                response.ContentType = "application/json";
+                await response.WriteAsync("{\"version\": \"0.9.6\"}");
             }
             _logger.LogDebug($"Proxy: Request {context.Request.GetDisplayUrl()} method {context.Request.Method} proxied to {transformContext.Path}");
         });

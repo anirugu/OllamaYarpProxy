@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http.Extensions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Text;
 using Yarp.ReverseProxy.Transforms;
 using Yarp.ReverseProxy.Transforms.Builder;
 
@@ -34,7 +36,39 @@ public class StandardTransform : ITransformProvider
                 transformContext.Path = "/models";
                 _logger.LogInformation("Proxy: Request path rewritten from /api/tags to /api/models");
             }
-            _logger.LogDebug("Proxy: Request {0} proxied to {1}", context.Request.GetDisplayUrl(), transformContext.Path);
+            else if (context.Request.Path == "/v1/chat/completions")
+            {
+                //we need to change the request to the endpoint models
+                transformContext.Path = "/chat/completions";
+                _logger.LogInformation("Proxy: Request path rewritten from v1/chat/completions to v1/chat/completions");
+            }
+            else if (context.Request.Path == "/api/show")
+            {
+                context.Request.EnableBuffering();
+
+                using var reader = new StreamReader(context.Request.Body, Encoding.UTF8, leaveOpen: true);
+                string body = await reader.ReadToEndAsync();
+
+                // deserialize in json 
+                var json = JsonConvert.DeserializeObject(body) as JObject;
+                var model = json.Value<string>("model");
+
+                var response = transformContext.HttpContext.Response;
+                response.StatusCode = 200;
+                response.ContentType = "application/json";
+
+                GemmaModel answer = new GemmaModel();
+                //answer.License = "MIT";
+                //answer.Modelfile = "model.gguf";
+                answer.Capabilities = new List<string> { "chat"};
+                answer.ModelInfo = new ModelInfo();
+                answer.ModelInfo.Architecture = model;
+
+                var jsonResponse = JsonConvert.SerializeObject(answer, Formatting.Indented);    
+
+                await response.WriteAsync(jsonResponse);
+            }
+            _logger.LogDebug($"Proxy: Request {context.Request.GetDisplayUrl()} method {context.Request.Method} proxied to {transformContext.Path}");
         });
 
         context.CopyResponseHeaders = true;

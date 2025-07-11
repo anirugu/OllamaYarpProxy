@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http.Extensions;
+using Newtonsoft.Json;
 using Yarp.ReverseProxy.Transforms;
 using Yarp.ReverseProxy.Transforms.Builder;
 
@@ -20,33 +21,19 @@ public class StandardTransform : ITransformProvider
             .Cluster
             .Destinations
             .Values
-            .Select(v =>v.Address) //#16250
+            .Select(v => v.Address) //#16250
             .ToHashSet();
 
         context.AddRequestTransform(async transformContext =>
         {
             var context = transformContext.HttpContext;
 
-            ////Proxy is normally propagating every header to the destination, but for NTLM (negotiate) you should
-            ////remove the header or the calling service will immediately respond with a 401, without even call
-            ////your auth module.
-            ////remember that bypass authentication should not remove auty handler
-            //bool isBypassUser = context.User?.Identity?.Name == BypassAuthenticationHandler.BypassUserName;
-            //bool isBypassJarvisTokenUser = context.User?.Identity?.Name == JarvisTokenBypassAuthenticationHandler.UserName;
-            //if (!isBypassUser && transformContext.ProxyRequest.Headers.Contains("Authorization"))
-            //{
-            //    transformContext.ProxyRequest.Headers.Remove("Authorization");
-            //}
-
-            //var automationPaths = _options.CurrentValue.AutomationPaths;
-
-            //var tokenOk = await AddAuthTokenToRequest(transformContext, context, isBypassUser, isBypassJarvisTokenUser, automationPaths);
-            //if (!tokenOk)
-            //{
-            //    //Something is not ok, we logout from the proxy.
-            //    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            //    _logger.Warning("token is not ok, user {0} logged out", context.User?.Identity?.Name ?? "anonymous");
-            //}
+            if (context.Request.Path == "/api/tags")
+            {
+                //we need to change the request to the endpoint models
+                transformContext.Path = "/models";
+                _logger.LogInformation("Proxy: Request path rewritten from /api/tags to /api/models");
+            }
             _logger.LogDebug("Proxy: Request {0} proxied to {1}", context.Request.GetDisplayUrl(), transformContext.Path);
         });
 
@@ -55,7 +42,42 @@ public class StandardTransform : ITransformProvider
         context.AddResponseTransform(async (transformContext) =>
         {
             var context = transformContext.HttpContext;
-            var response = context.Response;
+            var response = transformContext.ProxyResponse;
+            if (response.RequestMessage.RequestUri.LocalPath == "/models")
+            {
+                //I need to grab the original content and then change the schema
+                var content = await response.Content.ReadAsStringAsync();
+                var source = JsonConvert.DeserializeObject<SourceRoot>(content);
+
+                var ollamaModels = new OllamaRoot
+                {
+                    models = source.data
+                        .Select(m => new OllamaModel
+                        {
+                            name = m.id,
+                            model = m.id,
+                            modified_at = "2024-02-24T18:29:19.5508829+01:00",
+                            size = 1966917458,
+                            digest = Guid.NewGuid().ToString(),
+                        })
+                        .ToList()
+                };
+                var ollamaJson = JsonConvert.SerializeObject(ollamaModels, Formatting.Indented);
+
+                transformContext.SuppressResponseBody = true;
+
+                // Convert modified JSON to bytes
+                var modifiedBytes = System.Text.Encoding.UTF8.GetBytes(ollamaJson);
+
+                // Update the Content-Length header to match the new content
+                transformContext.HttpContext.Response.ContentLength = modifiedBytes.Length;
+
+                // Set the correct content type
+                transformContext.HttpContext.Response.ContentType = "application/json";
+
+                // Write the modified content
+                await transformContext.HttpContext.Response.Body.WriteAsync(modifiedBytes);
+            }
 
             //if (transformContext.ProxyResponse != null)
             //{

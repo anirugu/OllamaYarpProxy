@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  ollamayarp:
+    build:
+      context: ./OllamaYarpProject
+      dockerfile: Dockerfile
+    image: ollamayarp:latest
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:11434
+    ports:
+      - "11434:11434"
+    # Optional: mount local appsettings to override what's baked into the image
+    volumes:
+      - ./OllamaYarpProject/appsettings.json:/app/appsettings.json:ro
